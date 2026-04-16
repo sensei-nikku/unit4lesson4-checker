@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unit 4, Day 4 — Volume Checker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#F4F1EC;--surface:#FFF;--border:#D6D0C4;--text:#2C2A26;--muted:#7A756B;--accent:#1B6B93;--accent-lt:#E8F1F5;--ok:#3A7D44;--ok-lt:#E6F2E8;--warn:#C4841D;--warn-lt:#FDF3E4;--err:#B33A3A;--err-lt:#FBEAEA}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+.hdr{background:#1A2332;color:#E8E4DD;padding:14px 20px;position:sticky;top:0;z-index:100}
+.hdr-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.hdr h1{font-size:1.1rem;font-weight:600}.hdr .sub{font-size:.72rem;color:#8A9BB0;margin-top:1px}
+.nav-row{display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:10px;padding-bottom:4px}
+.nav-sep{width:1px;height:20px;background:#3A4556;margin:0 4px}
+.nd{padding:3px 8px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:.6rem;font-weight:600;border:1.5px solid #3A4556;color:#4A5568;background:transparent;cursor:pointer;transition:all .15s;white-space:nowrap}
+.nd:hover{border-color:#8A9BB0;color:#8A9BB0}
+.nd.done{background:var(--ok);border-color:var(--ok);color:#fff}
+.nd.skipped{background:var(--warn);border-color:var(--warn);color:#fff}
+.nd.active{border-color:var(--accent);color:#fff;background:var(--accent)}
+.progress-bar{height:4px;background:#2A3344;border-radius:2px;margin:8px 20px 0;overflow:hidden}
+.progress-fill{height:100%;background:var(--ok);transition:width .4s ease}
+.main{max-width:680px;margin:0 auto;padding:16px 16px 60px}
+.sh{margin:20px 0 12px;padding:10px 16px;background:#1A2332;color:#E8E4DD;border-radius:10px}
+.sh h2{font-size:.9rem;font-weight:600}.sh p{font-size:.72rem;color:#8A9BB0;margin-top:2px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:14px;display:none}
+.card.v{display:block}.card.done{display:block;padding:10px 18px;background:var(--ok-lt);border-color:var(--ok)}.card.done .body{display:none}
+.done-check{color:var(--ok);font-weight:600;font-size:.82rem;display:inline;margin-left:8px}
+.qn{font-family:'JetBrains Mono',monospace;font-size:.72rem;font-weight:500;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.qp{font-size:1rem;font-weight:600;margin-bottom:4px;line-height:1.5}
+.qp .note{font-weight:400;font-size:.88rem;color:var(--muted);display:block;margin-top:4px}
+.q-diagram{margin:8px 0 16px}
+.step{margin-bottom:16px;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.step-label{font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.chip-zone{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;min-height:50px}
+.chip{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 14px;border:2px solid var(--border);border-radius:10px;background:var(--surface);cursor:pointer;transition:all .18s;user-select:none;min-width:70px}
+.chip:hover{border-color:var(--accent);background:var(--accent-lt);transform:translateY(-2px)}.chip:active{transform:scale(.95)}
+.chip.dragging{opacity:.4;transform:scale(.9)}
+.chip svg{width:56px;height:48px}
+.chip.formula-chip{flex-direction:row;min-width:auto;padding:10px 18px}
+.chip.formula-chip .chip-label{font-size:.92rem;font-weight:500;color:var(--text)}
+.drop-target{border:2px dashed var(--border);border-radius:10px;padding:10px 20px;min-height:64px;display:flex;align-items:center;justify-content:center;transition:all .2s;margin-bottom:10px;overflow:hidden}
+.drop-target.filled{border-style:solid;border-color:var(--accent);background:var(--accent-lt)}
+.drop-target.correct{border-color:var(--ok);background:var(--ok-lt)}
+.drop-target.wrong{border-color:var(--err);background:var(--err-lt);animation:shake .4s}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.drop-target .placeholder{font-size:.82rem;color:var(--muted);font-style:italic}
+.drop-target svg{width:56px;height:48px}
+.alg-options{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;max-width:460px}
+.alg-opt{padding:10px 16px;border:2px solid var(--border);border-radius:8px;background:var(--surface);font-size:.9rem;cursor:pointer;transition:all .15s;text-align:left}
+.alg-opt:hover{border-color:var(--accent);background:var(--accent-lt)}
+.alg-opt.sel{border-color:var(--accent);background:var(--accent-lt);font-weight:600}
+.eq-display{font-family:'JetBrains Mono',monospace;font-size:1.05rem;font-weight:500;padding:12px 16px;background:#f8f6f3;border-radius:8px;margin-bottom:12px;text-align:center;border:1px solid var(--border)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:.88rem;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#145A7A}
+.btn-next{background:var(--ok);color:#fff;margin-top:8px}.btn-next:hover{background:#2D6636}
+.fb{padding:10px 14px;border-radius:8px;font-size:.88rem;margin-top:10px;margin-bottom:10px;line-height:1.5}
+.fb.ok{background:var(--ok-lt);color:var(--ok);border:1px solid var(--ok)}
+.fb.warn{background:var(--warn-lt);color:var(--warn);border:1px solid var(--warn)}
+.fb.err{background:var(--err-lt);color:var(--err);border:1px solid var(--err)}
+.input-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.input-row input{font-family:'JetBrains Mono',monospace;font-size:1rem;padding:8px 12px;border:2px solid var(--border);border-radius:8px;width:140px}
+.input-row input:focus{outline:none;border-color:var(--accent)}
+.form-toggle{display:flex;gap:6px;margin-bottom:10px}
+.form-toggle button{padding:6px 12px;border:2px solid var(--border);border-radius:6px;background:var(--surface);font-size:.8rem;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif}
+.form-toggle button.sel{border-color:var(--accent);background:var(--accent-lt);color:var(--accent);font-weight:600}
+.locked{opacity:.35;pointer-events:none}
+.redirect-banner{background:#FFF3E0;border:2px solid #E65100;border-radius:10px;padding:16px 18px;margin:14px 0;font-size:.95rem;line-height:1.6;color:#BF360C}
+.btn-skip{background:var(--warn);color:#fff;margin-top:8px;font-size:.82rem;padding:8px 16px}.btn-skip:hover{background:#A56A10}
+.cr-textarea{width:100%;min-height:80px;padding:10px;border:2px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:.9rem;resize:vertical}
+.cr-textarea:focus{outline:none;border-color:var(--accent)}
+.sticky-hint{background:#FFF9C4;border:1px solid #F9A825;border-radius:8px;padding:10px 14px;margin:10px 0;font-size:.85rem;color:#6D4C00}
+</style>
+</head>
+<body>
+<div class="hdr">
+<div class="hdr-top"><div><h1>Volume &mdash; Checker</h1><div class="sub">Unit 4, Day 4 &middot; Geometry 1</div></div></div>
+<div class="nav-row" id="nav"></div>
+</div>
+<div class="progress-bar"><div class="progress-fill" id="pbar"></div></div>
+<div class="main" id="main"></div>
+<script>
+// ── SVG HELPERS ──
+var C='#2C2A26',M='#7A756B',F='font-family="DM Sans,sans-serif"';
+function txt(x,y,t,o){return '<text x="'+x+'" y="'+y+'" text-anchor="'+(o||'middle')+'" font-size="12" '+F+' fill="'+C+'">'+t+'</text>';}
+function mtxt(x,y,t){return '<text x="'+x+'" y="'+y+'" text-anchor="middle" font-size="11" '+F+' fill="'+M+'">'+t+'</text>';}
+
+// Label that sits along a line segment, rotated to match.
+// (x1,y1) and (x2,y2) are the endpoints the label should parallel.
+// offset is perpendicular distance from the line (positive = "above" in the sense of the normal).
+function lineLabel(x1,y1,x2,y2,offset,text){
+  var mx=(x1+x2)/2, my=(y1+y2)/2;
+  var dx=x2-x1, dy=y2-y1;
+  var len=Math.sqrt(dx*dx+dy*dy);
+  // Normal vector (perpendicular, rotated 90° counter-clockwise in screen coords = "above" the line)
+  var nx=-dy/len, ny=dx/len;
+  // Ensure normal points "up" visually (negative y in SVG) so offset positive pushes label up/out
+  if(ny>0){nx=-nx;ny=-ny;}
+  var px=mx+nx*offset, py=my+ny*offset;
+  var angle=Math.atan2(dy,dx)*180/Math.PI;
+  // Keep text right-side-up: if angle is past vertical, flip 180
+  if(angle>90)angle-=180;else if(angle<-90)angle+=180;
+  return '<text x="'+px.toFixed(1)+'" y="'+py.toFixed(1)+'" text-anchor="middle" font-size="12" '+F+' fill="'+C+'" transform="rotate('+angle.toFixed(1)+' '+px.toFixed(1)+' '+py.toFixed(1)+')">'+text+'</text>';
+}
+
+function drawDiagram(q){
+  if(!q.dims)return '';
+  // Generous viewBox with margin on all sides for rotated labels
+  var d=q.dims,s='<svg viewBox="-10 20 270 160" width="240" xmlns="http://www.w3.org/2000/svg">';
+  if(q.shape==='rprism'){
+    // Rect prism geometry:
+    //   Front face: (40,60)-(140,60)-(140,120)-(40,120)
+    //   Depth offset: (+25, -18) — back face top-left (65,42), top-right (165,42)
+    //   Top-right diagonal edge: (140,60) → (165,42), angle -35.8°
+    s+='<polygon points="40,60 140,60 165,42 65,42" fill="none" stroke="'+C+'" stroke-width="2"/>';
+    s+='<rect x="40" y="60" width="100" height="60" fill="none" stroke="'+C+'" stroke-width="2"/>';
+    s+='<line x1="140" y1="60" x2="165" y2="42" stroke="'+C+'" stroke-width="2"/>';
+    s+='<line x1="140" y1="120" x2="165" y2="102" stroke="'+C+'" stroke-width="2"/>';
+    s+='<line x1="165" y1="42" x2="165" y2="102" stroke="'+C+'" stroke-width="2"/>';
+    s+='<line x1="40" y1="60" x2="65" y2="42" stroke="'+C+'" stroke-width="1" stroke-dasharray="4,3" opacity=".5"/>';
+    // Length: horizontal, below front-bottom edge midpoint (90, 120)
+    s+='<text x="90" y="138" text-anchor="middle" font-size="12" '+F+' fill="'+C+'">'+d.l+'</text>';
+    // Height: right of back-right edge. rotate(90) reads bottom-to-top (upright, tilt head right).
+    s+='<text x="178" y="90" text-anchor="middle" font-size="12" '+F+' fill="'+C+'" transform="rotate(90 178 90)">'+d.h+'</text>';
+    // Depth: top-right diagonal (140,60)->(165,42). Push label up-right clearly away from the edge.
+    s+='<text x="170" y="30" text-anchor="middle" font-size="12" '+F+' fill="'+C+'" transform="rotate(-35.8 170 30)">'+d.w+'</text>';
+    if(d.V)s+='<text x="255" y="170" text-anchor="end" font-size="11" '+F+' fill="'+M+'">V = '+d.V+'</text>';
+  }else if(q.shape==='cyl'){
+    s+='<ellipse cx="95" cy="40" rx="40" ry="10" fill="none" stroke="'+C+'" stroke-width="2"/>';
+    s+='<line x1="55" y1="40" x2="55" y2="130" stroke="'+C+'" stroke-width="2"/>';
+    s+='<line x1="135" y1="40" x2="135" y2="130" stroke="'+C+'" stroke-width="2"/>';
+    s+='<path d="M 55 130 A 40 10 0 0 0 135 130" fill="none" stroke="'+C+'" stroke-width="2"/>';
+    s+='<path d="M 55 130 A 40 10 0 0 1 135 130" fill="none" stroke="'+C+'" stroke-width="1" stroke-dasharray="4,3" opacity=".5"/>';
+    if(d.r){
+      s+='<line x1="95" y1="40" x2="135" y2="40" stroke="'+C+'" stroke-width="1.5"/>';
+      s+='<circle cx="95" cy="40" r="2" fill="'+C+'"/>';
+      // Radius: horizontal, above the line
+      s+='<text x="115" y="33" text-anchor="middle" font-size="12" '+F+' fill="'+C+'">'+d.r+'</text>';
+    }
+    if(d.h){
+      // Height: right side of cylinder at x=135. Place label x=152 clearly outside, rotate -90
+      s+='<text x="152" y="85" text-anchor="middle" font-size="12" '+F+' fill="'+C+'" transform="rotate(90 152 85)">'+d.h+'</text>';
+    }
+    if(d.V)s+='<text x="240" y="165" text-anchor="end" font-size="11" '+F+' fill="'+M+'">V = '+d.V+'</text>';
+  }else if(q.shape==='tprism'){
+    // Triangular prism: front triangle (25,125)-(95,125)-(60,55); depth (+65,-25)
+    s+='<polygon points="25,125 95,125 60,55" fill="none" stroke="'+C+'" stroke-width="2"/>';
+    s+='<polygon points="95,125 180,100 145,30 60,55" fill="none" stroke="'+C+'" stroke-width="2"/>';
+    s+='<line x1="60" y1="55" x2="145" y2="30" stroke="'+C+'" stroke-width="2"/>';
+    s+='<line x1="60" y1="55" x2="60" y2="125" stroke="'+C+'" stroke-width="1" stroke-dasharray="4,3" opacity=".5"/>';
+    s+='<line x1="58" y1="57" x2="62" y2="57" stroke="'+C+'" stroke-width="1"/>';
+    s+='<line x1="62" y1="57" x2="62" y2="53" stroke="'+C+'" stroke-width="1"/>';
+    // Triangle base: horizontal, below
+    s+='<text x="60" y="143" text-anchor="middle" font-size="12" '+F+' fill="'+C+'">'+d.b+'</text>';
+    // Triangle height: vertical dashed, rotated -90, placed left of triangle
+    s+='<text x="18" y="90" text-anchor="middle" font-size="12" '+F+' fill="'+C+'" transform="rotate(90 18 90)">'+d.htri+'</text>';
+    // Prism length: bottom diagonal (95,125)->(180,100). angle atan2(-25,85) ≈ -16.4°
+    // Midpoint (137.5, 112.5). Offset BELOW the line (away from shape): perpendicular down-right
+    s+='<text x="140" y="130" text-anchor="middle" font-size="12" '+F+' fill="'+C+'" transform="rotate(-16.4 140 130)">'+d.H+'</text>';
+    if(d.V)s+='<text x="240" y="165" text-anchor="end" font-size="11" '+F+' fill="'+M+'">V = '+d.V+'</text>';
+  }else if(q.shape==='pyr'){
+    // Square pyramid: base (30,125)-(150,125)-(180,105)-(60,105); apex (95,30)
+    s+='<polygon points="30,125 150,125 180,105 60,105" fill="none" stroke="'+C+'" stroke-width="2"/>';
+    s+='<line x1="30" y1="125" x2="95" y2="30" stroke="'+C+'" stroke-width="2"/>';
+    s+='<line x1="150" y1="125" x2="95" y2="30" stroke="'+C+'" stroke-width="2"/>';
+    s+='<line x1="180" y1="105" x2="95" y2="30" stroke="'+C+'" stroke-width="2"/>';
+    s+='<line x1="60" y1="105" x2="95" y2="30" stroke="'+C+'" stroke-width="1" stroke-dasharray="4,3" opacity=".5"/>';
+    s+='<line x1="95" y1="115" x2="95" y2="30" stroke="'+C+'" stroke-width="1" stroke-dasharray="4,3" opacity=".5"/>';
+    // Base edge: horizontal, below
+    s+='<text x="90" y="143" text-anchor="middle" font-size="12" '+F+' fill="'+C+'">'+d.s+'</text>';
+    // Height: pyramid silhouette near apex extends right to x≈175. Place label at x=195 for safe clearance.
+    s+='<text x="195" y="75" text-anchor="middle" font-size="12" '+F+' fill="'+C+'" transform="rotate(90 195 75)">'+d.h+'</text>';
+    if(d.V)s+='<text x="240" y="165" text-anchor="end" font-size="11" '+F+' fill="'+M+'">V = '+d.V+'</text>';
+  }else if(q.shape==='cone'){
+    // Cone: apex (95,30), base ellipse at y=115 with rx=45
+    s+='<line x1="50" y1="115" x2="95" y2="30" stroke="'+C+'" stroke-width="2"/>';
+    s+='<line x1="140" y1="115" x2="95" y2="30" stroke="'+C+'" stroke-width="2"/>';
+    s+='<path d="M 50 115 A 45 10 0 0 0 140 115" fill="none" stroke="'+C+'" stroke-width="2"/>';
+    s+='<path d="M 50 115 A 45 10 0 0 1 140 115" fill="none" stroke="'+C+'" stroke-width="1" stroke-dasharray="4,3" opacity=".5"/>';
+    s+='<line x1="95" y1="115" x2="95" y2="30" stroke="'+C+'" stroke-width="1" stroke-dasharray="4,3" opacity=".5"/>';
+    s+='<circle cx="95" cy="115" r="2" fill="'+C+'"/>';
+    if(d.r){
+      s+='<line x1="95" y1="115" x2="140" y2="115" stroke="'+C+'" stroke-width="1.5"/>';
+      // Radius: horizontal, below the line
+      s+='<text x="117" y="130" text-anchor="middle" font-size="12" '+F+' fill="'+C+'">'+d.r+'</text>';
+    }
+    if(d.h){
+      // Height: dashed axis at x=95. Left cone edge at y=75 is at x=50+(95-50)·(115-75)/(115-30) ≈ 71
+      // Place label at x=48, rotated -90
+      s+='<text x="48" y="75" text-anchor="middle" font-size="12" '+F+' fill="'+C+'" transform="rotate(90 48 75)">'+d.h+'</text>';
+    }
+    if(d.slant){
+      // Slant line: apex (95,30) to right rim (140,115). Angle atan2(85,45) ≈ 62.1°
+      s+='<line x1="95" y1="30" x2="140" y2="115" stroke="#1B6B93" stroke-width="2.5"/>';
+      s+='<polygon points="95,30 100,34 92,38" fill="#1B6B93"/>';
+      s+='<polygon points="140,115 135,110 144,108" fill="#1B6B93"/>';
+      // Label offset perpendicular to slant, right-outward. Midpoint (117.5, 72.5).
+      // Outward unit vec (0.884, -0.468). Offset 24 units: (138.7, 61.3)
+      s+='<text x="145" y="60" text-anchor="middle" font-size="12" '+F+' fill="#1B6B93" font-weight="600" transform="rotate(62 145 60)">'+d.slant+'</text>';
+    }
+    if(d.V)s+='<text x="240" y="165" text-anchor="end" font-size="11" '+F+' fill="'+M+'">V = '+d.V+'</text>';
+  }else if(q.shape==='sph'){
+    s+='<circle cx="120" cy="85" r="55" fill="none" stroke="'+C+'" stroke-width="2"/>';
+    s+='<ellipse cx="120" cy="85" rx="55" ry="15" fill="none" stroke="'+C+'" stroke-width="1" stroke-dasharray="4,3" opacity=".5"/>';
+    s+='<circle cx="120" cy="85" r="2" fill="'+C+'"/>';
+    if(d.r){
+      s+='<line x1="120" y1="85" x2="175" y2="85" stroke="'+C+'" stroke-width="1.5"/>';
+      // Radius: horizontal, above the line
+      s+='<text x="147" y="78" text-anchor="middle" font-size="12" '+F+' fill="'+C+'">'+d.r+'</text>';
+    }
+    if(d.V)s+='<text x="240" y="165" text-anchor="end" font-size="11" '+F+' fill="'+M+'">V = '+d.V+'</text>';
+  }
+  s+='</svg>';return s;
+}
+
+// ── SHAPE ID CHIPS ──
+var SHAPE_SVG={
+  rprism:'<svg viewBox="0 0 56 48"><polygon points="6,16 36,16 48,8 18,8" fill="none" stroke="'+C+'" stroke-width="2"/><rect x="6" y="16" width="30" height="24" fill="none" stroke="'+C+'" stroke-width="2"/><line x1="36" y1="16" x2="48" y2="8" stroke="'+C+'" stroke-width="2"/><line x1="36" y1="40" x2="48" y2="32" stroke="'+C+'" stroke-width="2"/><line x1="48" y1="8" x2="48" y2="32" stroke="'+C+'" stroke-width="2"/></svg>',
+  cyl:'<svg viewBox="0 0 56 48"><ellipse cx="28" cy="10" rx="16" ry="4" fill="none" stroke="'+C+'" stroke-width="2"/><line x1="12" y1="10" x2="12" y2="40" stroke="'+C+'" stroke-width="2"/><line x1="44" y1="10" x2="44" y2="40" stroke="'+C+'" stroke-width="2"/><path d="M 12 40 A 16 4 0 0 0 44 40" fill="none" stroke="'+C+'" stroke-width="2"/></svg>',
+  tprism:'<svg viewBox="0 0 56 48"><polygon points="8,40 28,40 18,18" fill="none" stroke="'+C+'" stroke-width="2"/><polygon points="28,40 50,32 40,10 18,18" fill="none" stroke="'+C+'" stroke-width="2"/><line x1="18" y1="18" x2="40" y2="10" stroke="'+C+'" stroke-width="2"/></svg>',
+  pyr:'<svg viewBox="0 0 56 48"><polygon points="6,40 38,40 48,32 16,32" fill="none" stroke="'+C+'" stroke-width="2"/><line x1="6" y1="40" x2="27" y2="6" stroke="'+C+'" stroke-width="2"/><line x1="38" y1="40" x2="27" y2="6" stroke="'+C+'" stroke-width="2"/><line x1="48" y1="32" x2="27" y2="6" stroke="'+C+'" stroke-width="2"/></svg>',
+  cone:'<svg viewBox="0 0 56 48"><line x1="12" y1="38" x2="28" y2="8" stroke="'+C+'" stroke-width="2"/><line x1="44" y1="38" x2="28" y2="8" stroke="'+C+'" stroke-width="2"/><path d="M 12 38 A 16 4 0 0 0 44 38" fill="none" stroke="'+C+'" stroke-width="2"/></svg>',
+  sph:'<svg viewBox="0 0 56 48"><circle cx="28" cy="24" r="18" fill="none" stroke="'+C+'" stroke-width="2"/><ellipse cx="28" cy="24" rx="18" ry="5" fill="none" stroke="'+C+'" stroke-width="1" stroke-dasharray="3,2" opacity=".5"/></svg>'
+};
+
+// ── FORMULAS ──
+// Volume formulas (correct) + distractors (surface area)
+var VOL_FORMULAS=[
+  {id:'Bh',label:'Bh'},
+  {id:'thirdBh',label:'\u2153Bh'},
+  {id:'fourthirdsPir3',label:'\u2153\u00B74\u03C0r\u00B3'},
+];
+// Actually sphere is (4/3)πr³ not (1/3)·4πr³. Using cleaner label:
+VOL_FORMULAS=[
+  {id:'Bh',label:'Bh'},
+  {id:'thirdBh',label:'\u2153Bh'},
+  {id:'sphereVol',label:'\u2074\u2044\u2083\u03C0r\u00B3'},
+];
+// Distractors — surface area / wrong formulas
+var DIST_FORMULAS=[
+  {id:'2B_Ph',label:'2B + Ph'},         // SA prism
+  {id:'halfPl_B',label:'\u00BDp\u2113 + B'}, // SA pyramid/cone
+  {id:'fourPir2',label:'4\u03C0r\u00B2'},     // SA sphere
+];
+var ALL_FORMULAS=VOL_FORMULAS.concat(DIST_FORMULAS);
+// Shape to correct formula
+var S2F={rprism:'Bh',cyl:'Bh',tprism:'Bh',pyr:'thirdBh',cone:'thirdBh',sph:'sphereVol'};
+var SHAPES=['rprism','cyl','tprism','pyr','cone','sph'];
+function shuffle(arr){var a=arr.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+
+var STAGES=[
+  {t:'Practice',d:'Show all work on your practice sheet. Leave \u03C0 in answers when asked.'},
+  {t:'Independent Practice',d:'Show all work. Watch for shapes where height \u2260 slant height.'},
+  {t:'Conceptual Reasoning',d:'These ask WHY, not just HOW.'}
+];
+
+// Problems. For forward: ans is the final number.
+// For π-answers: ansPi is the coefficient, ansDec is the decimal — checker accepts either.
+var QS=[
+  // ── PRACTICE forward (lock formula pattern first) ──
+  {id:'p1',stage:0,num:'P-1',shape:'rprism',dir:'forward',
+    prompt:'Find the volume of the rectangular prism.',
+    ans:280,unit:'ft\u00B3',
+    dims:{l:'10 ft',w:'7 ft',h:'4 ft'}},
+
+  {id:'p2',stage:0,num:'P-2',shape:'cyl',dir:'forward',
+    prompt:'Find the volume of the cylinder. Leave answer in terms of \u03C0.',
+    note:'Type the coefficient of \u03C0 (example: for 144\u03C0 type 144).',
+    ansPi:144,unit:'m\u00B3',piForm:true,
+    dims:{r:'4 m',h:'9 m'}},
+
+  {id:'p3',stage:0,num:'P-3',shape:'pyr',dir:'forward',
+    prompt:'Find the volume of the square pyramid.',
+    note:'Remember the \u2153 for pyramids!',
+    ans:96,unit:'in\u00B3',
+    dims:{s:'6 in.',h:'8 in.'}},
+
+  {id:'p4',stage:0,num:'P-4',shape:'cone',dir:'forward',
+    prompt:'Find the volume of the cone. Leave answer in terms of \u03C0.',
+    ansPi:60,unit:'cm\u00B3',piForm:true,
+    dims:{r:'6 cm',h:'5 cm'}},
+
+  {id:'p5',stage:0,num:'P-5',shape:'sph',dir:'forward',
+    prompt:'Find the volume of the sphere. Leave answer in terms of \u03C0.',
+    ansPi:36,unit:'in\u00B3',piForm:true,
+    dims:{r:'3 in.'}},
+
+  // ── PRACTICE backward ──
+  {id:'p6',stage:0,num:'P-6',shape:'cyl',dir:'backward',
+    prompt:'Find the height of the cylinder.',
+    ans:8,unit:'cm',
+    dims:{r:'5 cm',h:'?',V:'200\u03C0 cm\u00B3'},
+    equation:'200\u03C0 = \u03C0(5)\u00B2h  \u2192  200\u03C0 = 25\u03C0h',
+    alg:[
+      {prompt:'Multiply both sides by ___ to cancel the \u03C0.',
+        opts:['1/\u03C0','\u03C0','\u22121/\u03C0','Square root'],correct:0,
+        result:'(1/\u03C0)\u00B7200\u03C0 = (1/\u03C0)\u00B725\u03C0h \u2192 200 = 25h'},
+      {prompt:'Multiply both sides by ___ to isolate h.',
+        opts:['1/25','25','\u22121/25','Square root'],correct:0,
+        result:'(1/25)\u00B7200 = h \u2192 calculator form'}
+    ]},
+
+  // ── IP forward ──
+  {id:'ip1',stage:1,num:'IP-1',shape:'rprism',dir:'forward',
+    prompt:'Find the volume.',
+    ans:360,unit:'cm\u00B3',
+    dims:{l:'12 cm',w:'5 cm',h:'6 cm'}},
+
+  {id:'ip2',stage:1,num:'IP-2',shape:'cyl',dir:'forward',
+    prompt:'Find the volume. Leave answer in terms of \u03C0.',
+    ansPi:150,unit:'in\u00B3',piForm:true,
+    dims:{r:'5 in.',h:'6 in.'}},
+
+  {id:'ip3',stage:1,num:'IP-3',shape:'tprism',dir:'forward',
+    prompt:'Find the volume of the triangular prism.',
+    note:'Base area is the TRIANGLE. B = \u00BDbh.',
+    ans:84,unit:'m\u00B3',
+    dims:{b:'6 m',htri:'4 m',H:'7 m'}},
+
+  {id:'ip4',stage:1,num:'IP-4',shape:'pyr',dir:'forward',
+    prompt:'Find the volume of the square pyramid.',
+    ans:150,unit:'ft\u00B3',
+    dims:{s:'5 ft',h:'18 ft'}},
+
+  {id:'ip5',stage:1,num:'IP-5',shape:'cone',dir:'forward',
+    prompt:'Find the volume of the cone. Round to the nearest tenth.',
+    ans:150.8,unit:'m\u00B3',tol:.3,
+    dims:{r:'4 m',h:'9 m'}},
+
+  {id:'ip6',stage:1,num:'IP-6',shape:'sph',dir:'forward',
+    prompt:'Find the volume of the sphere. Round to the nearest tenth.',
+    ans:904.8,unit:'cm\u00B3',tol:2,
+    dims:{r:'6 cm'}},
+
+  // ── IP backward ──
+  {id:'ip7',stage:1,num:'IP-7',shape:'rprism',dir:'backward',
+    prompt:'Find the height of the rectangular prism.',
+    ans:5,unit:'in',
+    dims:{l:'8 in.',w:'6 in.',h:'?',V:'240 in\u00B3'},
+    equation:'240 = (8)(6)h  \u2192  240 = 48h',
+    alg:[{prompt:'Multiply both sides by ___ to isolate h.',
+      opts:['1/48','48','\u22121/48','Square root'],correct:0,
+      result:'(1/48)\u00B7240 = h \u2192 calculator form'}]},
+
+  {id:'ip8',stage:1,num:'IP-8',shape:'pyr',dir:'backward',
+    prompt:'The pyramid has a square base with side 6 in and volume 72 in\u00B3. Find the height.',
+    ans:6,unit:'in',
+    dims:{s:'6 in.',h:'?',V:'72 in\u00B3'},
+    equation:'72 = \u2153(6)\u00B2h  \u2192  72 = \u2153(36)h  \u2192  72 = 12h',
+    alg:[
+      {prompt:'Multiply both sides by ___ to undo the \u2153.',
+        opts:['3','\u2153','1/36','\u22123'],correct:0,
+        result:'3\u00B772 = 36h \u2192 216 = 36h'},
+      {prompt:'Multiply both sides by ___ to isolate h.',
+        opts:['1/36','36','\u22121/36','Square root'],correct:0,
+        result:'(1/36)\u00B7216 = h \u2192 calculator form'}
+    ]},
+
+  // ── IP hardest: slant height trap ──
+  {id:'ip9',stage:1,num:'IP-9',shape:'cone',dir:'forward',
+    prompt:'Find the volume of the cone. Leave answer in terms of \u03C0.',
+    note:'TRAP: the number given is the SLANT height (\u2113), not the vertical height. Use the Pythagorean theorem on your sticky note first.',
+    ansPi:324,unit:'ft\u00B3',piForm:true,
+    dims:{r:'9 ft',slant:'\u2113 = 15 ft'},
+    stickyHint:'You need vertical height h. Use r\u00B2 + h\u00B2 = \u2113\u00B2  \u2192  9\u00B2 + h\u00B2 = 15\u00B2  \u2192  h = 12 ft.'},
+
+  // ── CR ──
+  {id:'cr1',stage:2,num:'CR-1',type:'explain',
+    prompt:'A cylinder and a cone both have radius 4 and height 9. The cylinder has volume 144\u03C0. Without multiplying, what is the cone\u2019s volume?',
+    key:'48\u03C0. A cone with the same base and height as a cylinder holds exactly one-third as much. 144\u03C0 \u00F7 3 = 48\u03C0.'},
+  {id:'cr2',stage:2,num:'CR-2',type:'explain',
+    prompt:'Aaliyah says: \u201CI doubled the radius of a sphere, so the volume doubled.\u201D Try r = 3 then r = 6. What actually happens?',
+    key:'r=3 \u2192 V=36\u03C0. r=6 \u2192 V=288\u03C0. Volume went up 8 times, not 2 times, because r is cubed: (2r)\u00B3 = 8r\u00B3.'},
+  {id:'cr3',stage:2,num:'CR-3',type:'explain',
+    prompt:'A cone problem gives slant height \u2113 = 10 and radius r = 6. A student plugs 10 in as the height and computes V = (1/3)\u03C0(36)(10) = 120\u03C0. Why is this wrong?',
+    key:'The volume formula needs the VERTICAL height h, not the slant height \u2113. First use r\u00B2+h\u00B2=\u2113\u00B2 to get h = 8. Then V = (1/3)\u03C0(36)(8) = 96\u03C0.'}
+];
+
+// ── STATE ──
+var S={},activeQ=0,formulaOrders={},shapeOrders={};
+function init(){S={};formulaOrders={};shapeOrders={};
+  for(var i=0;i<QS.length;i++){var q=QS[i];
+    S[q.id]={shapeSel:'',shapeOk:false,formulaSel:'',formulaOk:false,algStep:0,algSel:-1,algDone:false,ansVal:'',correct:false,dismissed:false,feedback:'',
+      shapeAttempts:0,formulaAttempts:0,algAttempts:0,ansAttempts:0,redirected:false,redirectStep:'',skipped:false,crText:''};
+    if(q.type!=='explain'){formulaOrders[q.id]=shuffle(ALL_FORMULAS);shapeOrders[q.id]=shuffle(SHAPES);}}
+  activeQ=0;}
+function navTo(qi){if(qi>=0&&qi<QS.length){activeQ=qi;render();window.scrollTo({top:0,behavior:'smooth'});}}
+
+// ── ACTIONS ──
+function tapShape(id,shape){
+  var q=qById(id),s=S[id];if(s.shapeOk||s.redirected)return;
+  s.shapeSel=shape;s.feedback='';
+  if(shape===q.shape){s.shapeOk=true;}
+  else{s.shapeAttempts++;
+    if(s.shapeAttempts>=2){s.redirected=true;s.redirectStep='shape';s.feedback='redirect:';}
+    else s.feedback='err:Look at the shape in the diagram. Which one matches?';}
+  render();}
+
+function tapFormula(id,fid){
+  var q=qById(id),s=S[id];if(s.formulaOk||s.redirected)return;
+  s.formulaSel=fid;s.feedback='';
+  if(fid===S2F[q.shape]){s.formulaOk=true;}
+  else{s.formulaAttempts++;
+    if(s.formulaAttempts>=3){s.redirected=true;s.redirectStep='formula';s.feedback='redirect:';}
+    else{
+      var msg='That doesn\u2019t match this shape.';
+      if(fid==='2B_Ph')msg='That\u2019s a surface area formula, not volume.';
+      else if(fid==='halfPl_B')msg='That\u2019s a surface area formula, not volume.';
+      else if(fid==='fourPir2')msg='That\u2019s the surface area of a sphere \u2014 you want volume.';
+      else if(fid==='Bh'&&(q.shape==='pyr'||q.shape==='cone'))msg='Close, but pointy shapes need a \u2153 in front.';
+      else if(fid==='thirdBh'&&(q.shape==='rprism'||q.shape==='cyl'||q.shape==='tprism'))msg='Flat-top shapes don\u2019t use the \u2153 \u2014 that\u2019s for pointy shapes.';
+      else if(fid==='sphereVol'&&q.shape!=='sph')msg='The (4/3)\u03C0r\u00B3 formula is only for spheres.';
+      s.feedback='err:'+msg;}}
+  render();}
+
+function pickAlg(id,idx){var s=S[id];if(!s.redirected){s.algSel=idx;s.feedback='';render();}}
+function checkAlg(id){var q=qById(id),s=S[id],step=q.alg[s.algStep];if(s.redirected)return;
+  if(s.algSel===step.correct){s.algStep++;s.algSel=-1;s.feedback='';if(s.algStep>=q.alg.length)s.algDone=true;}
+  else{s.algAttempts++;if(s.algAttempts>=2){s.redirected=true;s.redirectStep='alg';s.feedback='redirect:';}
+    else s.feedback='err:Not that operation. What undoes what\u2019s happening to the variable?';}render();}
+
+function checkAnswer(id){var q=qById(id),s=S[id];if(s.redirected)return;
+  var raw=s.ansVal.trim().replace(/\u03C0/g,'').replace(/pi/gi,'').trim();
+  var v=parseFloat(raw);
+  if(isNaN(v)){s.feedback='err:Enter a number.';render();return;}
+  s.ansAttempts++;
+  var target,tol;
+  if(q.piForm){
+    target=q.ansPi;
+    // Accept either π-coefficient OR decimal (π × coefficient)
+    tol=Math.max(0.5,target*0.02);
+    var diffPi=Math.abs(v-target);
+    var diffDec=Math.abs(v-target*Math.PI);
+    var tolDec=Math.max(target*Math.PI*0.02,0.5);
+    if(diffPi<tol||diffDec<tolDec){s.correct=true;s.feedback='ok:';render();return;}
+    // Check common errors
+    if(s.ansAttempts>=3){s.redirected=true;s.redirectStep='ans';s.feedback='redirect:';render();return;}
+    if(diffPi<target*0.08||diffDec<target*Math.PI*0.08){s.feedback='warn:Close! Check your arithmetic or rounding.';render();return;}
+    // Common error messages
+    var m='';
+    // Forgot ⅓?
+    if(q.shape==='pyr'||q.shape==='cone'){
+      if(Math.abs(v-target*3)<target*0.05)m='Did you forget the \u2153? Pyramids and cones need it.';
+    }
+    // Forgot 4/3?
+    if(q.shape==='sph'){
+      if(Math.abs(v-target*3/4)<target*0.05)m='Check the formula \u2014 it\u2019s (4/3)\u03C0r\u00B3, not \u03C0r\u00B3.';
+    }
+    // Used slant height instead of h?
+    if(q.id==='ip9'&&Math.abs(v-405)<20)m='Did you use the slant height 15 in the formula? Volume needs the VERTICAL height. Pythagorean first: 9\u00B2+h\u00B2=15\u00B2.';
+    if(!m)m=s.ansAttempts===1?'Not quite. Check your substitution and try again.':'Double-check each step on your practice sheet.';
+    s.feedback='err:'+m;render();return;
+  }else{
+    target=q.ans;
+    tol=q.tol||0.5;
+    var diff=Math.abs(v-target);
+    if(diff<tol){s.correct=true;s.feedback='ok:';}
+    else if(s.ansAttempts>=3){s.redirected=true;s.redirectStep='ans';s.feedback='redirect:';}
+    else if(diff<target*0.08)s.feedback='warn:Close! Check your arithmetic or rounding.';
+    else{
+      var m='';
+      if(q.shape==='pyr'||q.shape==='cone'){
+        if(Math.abs(v-target*3)<target*0.05)m='Did you forget the \u2153? Pyramids and cones need it.';
+      }
+      if(q.shape==='sph'){
+        if(Math.abs(v-target*3/4)<target*0.05)m='Check the formula \u2014 it\u2019s (4/3)\u03C0r\u00B3, not \u03C0r\u00B3.';
+      }
+      if(!m)m=s.ansAttempts===1?'Not quite. Check your substitution and try again.':'Double-check each step on your practice sheet.';
+      s.feedback='err:'+m;}
+    render();
+  }}
+
+function skipProblem(id){
+  var q=qById(id),s=S[id];
+  s.redirected=false;s.feedback='';
+  if(s.redirectStep==='shape'){s.shapeOk=true;s.shapeSel=q.shape;}
+  else if(s.redirectStep==='formula'){s.formulaOk=true;s.formulaSel=S2F[q.shape];}
+  else if(s.redirectStep==='alg'){s.algStep++;s.algSel=-1;if(s.algStep>=q.alg.length)s.algDone=true;}
+  else if(s.redirectStep==='ans'){s.correct=true;s.feedback='ok:';s.dismissed=true;s.skipped=true;}
+  s.redirectStep='';render();}
+function dismiss(id){S[id].dismissed=true;var qi=qIndex(id);if(qi<QS.length-1)activeQ=qi+1;render();window.scrollTo({top:0,behavior:'smooth'});}
+function updAns(id,v){S[id].ansVal=v;S[id].feedback='';}
+function updCR(id,v){S[id].crText=v;}
+function submitCR(id){S[id].correct=true;S[id].feedback='ok:';render();}
+function qById(id){for(var i=0;i<QS.length;i++)if(QS[i].id===id)return QS[i];return null;}
+function qIndex(id){for(var i=0;i<QS.length;i++)if(QS[i].id===id)return i;return -1;}
+
+// ── RENDER ──
+function render(){
+  var nav=document.getElementById('nav');nav.innerHTML='';var ps=-1;
+  for(var i=0;i<QS.length;i++){
+    if(QS[i].stage!==ps){if(ps>=0){var sep=document.createElement('div');sep.className='nav-sep';nav.appendChild(sep);}ps=QS[i].stage;}
+    var d=document.createElement('div');d.className='nd';
+    if(S[QS[i].id].dismissed)d.className+=S[QS[i].id].skipped?' skipped':' done';
+    if(i===activeQ)d.className+=' active';d.textContent=QS[i].num;
+    (function(idx){d.addEventListener('click',function(){navTo(idx);});})(i);nav.appendChild(d);}
+  var done=0;for(var i=0;i<QS.length;i++)if(S[QS[i].id].dismissed)done++;
+  document.getElementById('pbar').style.width=(done/QS.length*100)+'%';
+
+  var m=document.getElementById('main');m.innerHTML='';var cs=-1;
+  for(var qi=0;qi<QS.length;qi++){
+    var q=QS[qi],st=S[q.id];
+    if(q.stage!==cs){cs=q.stage;if(qi===activeQ||(qi<=activeQ&&QS[activeQ].stage===q.stage)){var sh=document.createElement('div');sh.className='sh';sh.innerHTML='<h2>'+STAGES[q.stage].t+'</h2><p>'+STAGES[q.stage].d+'</p>';m.appendChild(sh);}}
+    var card=document.createElement('div');
+    if(st.dismissed){card.className='card done';card.innerHTML='<div class="qn">'+q.num+'<span class="done-check">\u2713</span></div>';if(QS[activeQ].stage===q.stage)m.appendChild(card);}
+    else if(qi===activeQ){
+      card.className='card v';var h='<div class="qn">'+q.num+'</div><div class="qp">'+esc(q.prompt);
+      if(q.note)h+='<span class="note">'+esc(q.note)+'</span>';
+      h+='</div>';
+      if(q.dims)h+='<div class="q-diagram">'+drawDiagram(q)+'</div>';
+      if(q.stickyHint)h+='<div class="sticky-hint"><strong>Sticky note:</strong> '+esc(q.stickyHint)+'</div>';
+      h+='<div class="body">';
+      h+=q.type==='explain'?renderExplain(q,st):renderCalc(q,st);
+      h+='</div>';card.innerHTML=h;m.appendChild(card);bindEvents(card,q,st);}}
+}
+
+function renderCalc(q,s){
+  var h='';
+  // STEP 1: SHAPE
+  h+='<div class="step"><div class="step-label">Step 1 \u2014 What shape?</div>';
+  if(!s.shapeOk){
+    h+='<div class="drop-target'+(s.shapeSel?(s.feedback?' wrong':' filled'):'')+'">';
+    h+=s.shapeSel?SHAPE_SVG[s.shapeSel]:'<span class="placeholder">Tap the matching shape</span>';
+    h+='</div><div class="chip-zone">';
+    var sh=shapeOrders[q.id]||SHAPES;
+    for(var i=0;i<sh.length;i++)h+='<div class="chip" data-shape="'+sh[i]+'">'+SHAPE_SVG[sh[i]]+'</div>';
+    h+='</div>';
+    if(s.feedback&&!s.shapeOk)h+=fbHtml(s.feedback);
+  }else h+='<div class="drop-target correct">'+SHAPE_SVG[q.shape]+'<span style="color:var(--ok);font-weight:600;margin-left:8px">\u2713</span></div>';
+  h+='</div>';
+
+  // STEP 2: FORMULA
+  var s2l=!s.shapeOk;
+  h+='<div class="step'+(s2l?' locked':'')+'"><div class="step-label">Step 2 \u2014 What formula?</div>';
+  if(!s.formulaOk){
+    h+='<div class="drop-target'+(s.formulaSel?(s.feedback?' wrong':' filled'):'')+'">';
+    if(s.formulaSel){var fl=null;var fL=formulaOrders[q.id]||[];for(var i=0;i<fL.length;i++)if(fL[i].id===s.formulaSel)fl=fL[i];
+      h+='<span style="font-size:1.05rem;font-weight:500">V = '+(fl?esc(fl.label):'')+'</span>';}
+    else h+='<span style="font-size:1.05rem;font-weight:500;color:var(--muted)">V = </span><span class="placeholder">tap a formula</span>';
+    h+='</div><div class="chip-zone">';
+    var fList=formulaOrders[q.id]||[];
+    for(var i=0;i<fList.length;i++)h+='<div class="chip formula-chip" data-formula="'+fList[i].id+'"><span class="chip-label">'+esc(fList[i].label)+'</span></div>';
+    h+='</div>';
+    if(s.feedback&&s.shapeOk&&!s.formulaOk)h+=fbHtml(s.feedback);
+  }else{var cf=null;for(var i=0;i<ALL_FORMULAS.length;i++)if(ALL_FORMULAS[i].id===S2F[q.shape])cf=ALL_FORMULAS[i];
+    h+='<div class="drop-target correct"><span style="font-size:1.05rem;font-weight:500">V = '+esc(cf.label)+'</span><span style="color:var(--ok);font-weight:600;margin-left:8px">\u2713</span></div>';}
+  h+='</div>';
+
+  // STEP 3
+  var s3l=!s.formulaOk;
+  h+='<div class="step'+(s3l?' locked':'')+'">';
+  if(q.dir==='backward'&&q.alg){
+    h+='<div class="step-label">Step 3 \u2014 Solve the equation</div>';
+    if(!s3l){
+      h+='<div class="eq-display">'+esc(q.equation)+'</div>';
+      for(var a=0;a<s.algStep;a++){
+        h+='<div style="margin-bottom:8px"><span style="color:var(--ok);font-weight:600">\u2713 '+esc(q.alg[a].opts[q.alg[a].correct])+'</span>';
+        if(q.alg[a].result)h+=' \u2192 <span style="font-family:\'JetBrains Mono\',monospace;font-weight:500">'+esc(q.alg[a].result)+'</span>';
+        h+='</div>';}
+      if(!s.algDone&&!s.redirected&&s.algStep<q.alg.length){
+        var curr=q.alg[s.algStep];
+        h+='<div style="font-size:.9rem;font-weight:600;margin:12px 0 8px">'+esc(curr.prompt)+'</div>';
+        h+='<div class="alg-options">';
+        for(var i=0;i<curr.opts.length;i++)h+='<div class="alg-opt'+(s.algSel===i?' sel':'')+'" data-alg="'+i+'">'+esc(curr.opts[i])+'</div>';
+        h+='</div><button class="btn btn-primary" id="chkAlg">Check</button>';
+        if(s.feedback&&s.formulaOk&&!s.algDone)h+=fbHtml(s.feedback);}
+      if(s.algDone&&!s.redirected){
+        h+='<div class="step-label" style="margin-top:14px">Your Answer</div>';
+        h+='<div class="input-row"><input type="text" id="ansInput" placeholder="number only" value="'+esc(s.ansVal)+'"><span style="font-size:.85rem;color:var(--muted)">'+esc(q.unit)+'</span><button class="btn btn-primary" id="chkAns">Check</button></div>';
+        if(s.feedback&&s.algDone)h+=fbHtml(s.feedback);
+        if(s.correct)h+='<button class="btn btn-next" id="nextBtn">Next \u2192</button>';}
+      if(s.redirected&&s.feedback)h+=fbHtml(s.feedback);}
+  }else{
+    h+='<div class="step-label">Step 3 \u2014 Solve on your practice sheet, enter your answer</div>';
+    if(!s3l&&!s.redirected){
+      var placeholder=q.piForm?'coefficient of \u03C0':'number only';
+      h+='<div class="input-row"><input type="text" id="ansInput" placeholder="'+placeholder+'" value="'+esc(s.ansVal)+'"><span style="font-size:.85rem;color:var(--muted)">'+(q.piForm?'\u03C0 '+esc(q.unit):esc(q.unit))+'</span><button class="btn btn-primary" id="chkAns">Check</button></div>';
+      if(s.feedback&&s.formulaOk)h+=fbHtml(s.feedback);
+      if(s.correct)h+='<button class="btn btn-next" id="nextBtn">Next \u2192</button>';}
+    if(s.redirected&&s.feedback&&s.formulaOk)h+=fbHtml(s.feedback);}
+  h+='</div>';return h;
+}
+
+function renderExplain(q,s){
+  var h='<div class="step"><div class="step-label">Your Explanation</div>';
+  h+='<textarea class="cr-textarea" id="crInput" placeholder="Type your reasoning...">'+esc(s.crText)+'</textarea>';
+  if(!s.correct)h+='<div style="margin-top:10px"><button class="btn btn-primary" id="crSubmit">Show Answer & Compare</button></div>';
+  if(s.correct){h+='<div class="fb ok" style="margin-top:10px"><strong>Model Answer:</strong><br>'+esc(q.key)+'</div>';h+='<button class="btn btn-next" id="nextBtn" style="margin-top:8px">Next \u2192</button>';}
+  h+='</div>';return h;}
+
+function fbHtml(fb){if(!fb)return '';var ci=fb.indexOf(':'),t=ci>=0?fb.substring(0,ci):'',msg=ci>=0?fb.substring(ci+1):'';
+  if(t==='ok')return '<div class="fb ok">\u2713 Correct!</div>';
+  if(t==='warn')return '<div class="fb warn">\u26A0 '+esc(msg)+'</div>';
+  if(t==='redirect')return '<div class="redirect-banner">\u270B Bring your practice sheet to your teacher and show them this step. It\u2019s okay to ask for help.</div><button class="btn btn-skip" id="skipBtn">Teacher helped \u2014 continue</button>';
+  return '<div class="fb err">\u2717 '+esc(msg)+'</div>';}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function bindEvents(card,q,st){
+  card.querySelectorAll('.chip[data-shape]').forEach(function(c){c.addEventListener('click',function(){tapShape(q.id,c.getAttribute('data-shape'));});});
+  card.querySelectorAll('.chip[data-formula]').forEach(function(c){c.addEventListener('click',function(){tapFormula(q.id,c.getAttribute('data-formula'));});});
+  card.querySelectorAll('.alg-opt').forEach(function(c){c.addEventListener('click',function(){pickAlg(q.id,parseInt(c.getAttribute('data-alg')));});});
+  var ca2=card.querySelector('#chkAlg');if(ca2)ca2.addEventListener('click',function(){checkAlg(q.id);});
+  var ai=card.querySelector('#ansInput');if(ai){ai.addEventListener('input',function(){updAns(q.id,this.value);});ai.addEventListener('keydown',function(e){if(e.key==='Enter')checkAnswer(q.id);});}
+  var ca=card.querySelector('#chkAns');if(ca)ca.addEventListener('click',function(){checkAnswer(q.id);});
+  var nb=card.querySelector('#nextBtn');if(nb)nb.addEventListener('click',function(){dismiss(q.id);});
+  var sb=card.querySelector('#skipBtn');if(sb)sb.addEventListener('click',function(){skipProblem(q.id);});
+  var ci=card.querySelector('#crInput');if(ci)ci.addEventListener('input',function(){updCR(q.id,this.value);});
+  var cs2=card.querySelector('#crSubmit');if(cs2)cs2.addEventListener('click',function(){submitCR(q.id);});}
+init();render();
+</script>
+</body>
+</html>
